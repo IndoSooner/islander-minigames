@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ending Effects Preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080915;
+      --panel: rgba(18, 22, 48, 0.78);
+      --line: rgba(170, 190, 255, 0.18);
+      --text: #f3f0ff;
+      --muted: #9aa0c7;
+      --win: #9b80ff;
+      --lose: #ff8a3d;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(123, 97, 255, 0.22), transparent 28rem),
+        radial-gradient(circle at 82% 8%, rgba(78, 205, 196, 0.12), transparent 24rem),
+        radial-gradient(circle at 50% 108%, rgba(255, 138, 61, 0.12), transparent 32rem),
+        linear-gradient(145deg, #070813, #11142a 58%, #090a15);
+    }
+
+    .page { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 36px; }
+    header { display: grid; gap: 10px; margin-bottom: 18px; text-align: center; }
+    .eyebrow { color: #a0c4ff; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.24em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(2.1rem, 6vw, 4.8rem); line-height: 0.94; letter-spacing: -0.06em; text-shadow: 0 16px 70px rgba(0,0,0,0.55); }
+    .subtitle { margin: 0 auto; max-width: 760px; color: var(--muted); line-height: 1.55; font-size: clamp(0.96rem, 1.6vw, 1.1rem); }
+
+    .toolbar {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 22px 0;
+      padding: 12px; border: 1px solid var(--line); border-radius: 20px;
+      background: rgba(8, 10, 26, 0.52); backdrop-filter: blur(16px);
+      box-shadow: 0 22px 80px rgba(0,0,0,0.28);
+    }
+
+    button {
+      border: 0; border-radius: 999px; padding: 0.75rem 1rem; color: #fff; font-weight: 800;
+      letter-spacing: 0.02em; cursor: pointer; transition: transform 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease;
+      background: rgba(255,255,255,0.10); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), 0 12px 38px rgba(0,0,0,0.22);
+    }
+    button:hover { transform: translateY(-2px); filter: brightness(1.12); }
+    button:active { transform: translateY(0) scale(0.98); }
+    .btn-win { background: linear-gradient(135deg, #7b61ff, #4ecdc4); }
+    .btn-lose { background: linear-gradient(135deg, #ff4d2e, #ffb03d); }
+    .btn-both { background: linear-gradient(135deg, #7b61ff, #ff8a3d); }
+
+    .stage {
+      position: relative; overflow: hidden; height: min(68vh, 720px); min-height: 430px;
+      border: 1px solid rgba(180, 200, 255, 0.17); border-radius: 28px;
+      background:
+        radial-gradient(circle at 50% 100%, rgba(43, 49, 96, 0.44), transparent 42%),
+        linear-gradient(180deg, rgba(5,7,19,0.38), rgba(10,11,25,0.88)),
+        #070914;
+      box-shadow: 0 30px 110px rgba(0,0,0,0.48), inset 0 0 70px rgba(123,97,255,0.06);
+      transform: translateZ(0);
+    }
+    .stage.shake { animation: stage-rumble 560ms cubic-bezier(.2,.9,.25,1); }
+    @keyframes stage-rumble {
+      0%, 100% { transform: translate3d(0,0,0); }
+      12% { transform: translate3d(-9px, 4px, 0) rotate(-0.25deg); }
+      25% { transform: translate3d(8px, -5px, 0) rotate(0.2deg); }
+      38% { transform: translate3d(-6px, -2px, 0) rotate(-0.18deg); }
+      52% { transform: translate3d(5px, 3px, 0) rotate(0.14deg); }
+      70% { transform: translate3d(-3px, 2px, 0); }
+    }
+
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .hud {
+      position: absolute; left: 18px; right: 18px; bottom: 16px; display: flex; justify-content: space-between; align-items: end; gap: 12px; pointer-events: none;
+    }
+    .badge {
+      max-width: 580px; padding: 14px 16px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(5, 7, 19, 0.54); backdrop-filter: blur(18px); box-shadow: 0 16px 50px rgba(0,0,0,0.24);
+    }
+    .badge strong { display: block; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.16em; color: #a0c4ff; }
+    .badge span { display: block; margin-top: 4px; color: #d8dcff; font-weight: 650; }
+    .status-pill { padding: 10px 12px; border-radius: 999px; color: #cfd5ff; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); font-size: 0.84rem; white-space: nowrap; }
+
+    .notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+    .note { padding: 16px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); color: #c8cbea; line-height: 1.48; }
+    .note b { color: #fff; }
+    @media (max-width: 760px) {
+      .stage { min-height: 520px; height: 64vh; }
+      .notes { grid-template-columns: 1fr; }
+      .hud { flex-direction: column; align-items: stretch; }
+      .status-pill { width: fit-content; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="eyebrow">Tic Tac Toe ending effects</div>
+      <h1>Winner + Loser Animation Preview</h1>
+      <p class="subtitle">Standalone approval page. These are canvas effects only — nothing has been integrated into the live game yet.</p>
+    </header>
+
+    <nav class="toolbar" aria-label="Animation controls">
+      <button class="btn-win" id="playWinner">Play Winner Fireworks</button>
+      <button class="btn-lose" id="playLoser">Play Loser Explosion</button>
+      <button class="btn-both" id="playBoth">Side-by-side</button>
+      <button id="replay">Replay</button>
+    </nav>
+
+    <section class="stage" id="stage" aria-label="Animation preview stage">
+      <canvas id="effectsCanvas"></canvas>
+      <div class="hud">
+        <div class="badge">
+          <strong id="modeLabel">Ready</strong>
+          <span id="modeCopy">Choose an effect to preview the victory and defeat treatments.</span>
+        </div>
+        <div class="status-pill" id="clock">0.0s</div>
+      </div>
+    </section>
+
+    <section class="notes">
+      <div class="note"><b>Winner direction:</b> layered fireworks, neon bloom, glitter embers, celebratory confetti, and a quick luminous flash.</div>
+      <div class="note"><b>Loser direction:</b> stylized arcade mushroom cloud, shockwave, smoke/ash, heat glow, and brief screen rumble — dramatic but cartoon-safe.</div>
+    </section>
+  </main>
+
+<script>
+// === TICTACTOE_ENDING_EFFECTS_PREVIEW ===
+// Standalone approval prototype. Later extraction point: WinnerFireworks,
+// LoserNuclearExplosion, and EndingEffectsPreview.play(mode).
+
+const canvas = document.getElementById('effectsCanvas');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+const modeLabel = document.getElementById('modeLabel');
+const modeCopy = document.getElementById('modeCopy');
+const clock = document.getElementById('clock');
+
+const DPR_MAX = 2;
+let W = 0, H = 0, dpr = 1;
+let particles = [];
+let flashes = [];
+let waves = [];
+let plumes = [];
+let mode = 'ready';
+let lastMode = 'both';
+let startTime = performance.now();
+let previousTime = startTime;
+let raf = null;
+let nextFireworkAt = 0;
+let bothDivider = 0.5;
+
+const palettes = {
+  fireworks: ['#7b61ff', '#4ecdc4', '#ffd166', '#ff6b9d', '#a0c4ff', '#f7f1ff'],
+  nuclear: ['#fff3b0', '#ffcf56', '#ff8a3d', '#ff4d2e', '#9a3412', '#6b7280'],
+  smoke: ['#36384d', '#596070', '#81858f', '#2a2d3d', '#b0a99d']
+};
+
+function resizeCanvas() {
+  const rect = stage.getBoundingClientRect();
+  dpr = Math.min(window.devicePixelRatio || 1, DPR_MAX);
+  W = Math.max(1, Math.floor(rect.width));
+  H = Math.max(1, Math.floor(rect.height));
+  canvas.width = Math.floor(W * dpr);
+  canvas.height = Math.floor(H * dpr);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+class Particle {
+  constructor(opts) { Object.assign(this, opts); this.age = 0; this.dead = false; this.trail = []; }
+  update(dt) {
+    this.age += dt;
+    if (this.age >= this.life) this.dead = true;
+    this.trail.push([this.x, this.y]);
+    if (this.trail.length > (this.trailLength || 8)) this.trail.shift();
+    this.vx += (this.ax || 0) * dt;
+    this.vy += (this.ay || 0) * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.vx *= Math.pow(this.drag || 0.995, dt * 60);
+    this.vy *= Math.pow(this.drag || 0.995, dt * 60);
+  }
+  draw() {
+    const t = Math.min(1, this.age / this.life);
+    const alpha = Math.max(0, Math.pow(1 - t, this.fadePower || 1.4)) * (this.alpha || 1);
+    if (alpha <= 0) return;
+
+    if (this.trail.length > 1) {
+      ctx.save();
+      ctx.globalCompositeOperation = this.blend || 'screen';
+      ctx.lineCap = 'round';
+      for (let i = 1; i < this.trail.length; i++) {
+        const a = alpha * (i / this.trail.length) * 0.42;
+        ctx.strokeStyle = hexAlpha(this.color, a);
+        ctx.lineWidth = (this.size || 2) * (i / this.trail.length) * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(this.trail[i - 1][0], this.trail[i - 1][1]);
+        ctx.lineTo(this.trail[i][0], this.trail[i][1]);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    const r = Math.max(0.4, (this.size || 2) * (this.grow ? (0.4 + t * this.grow) : 1));
+    ctx.save();
+    ctx.globalCompositeOperation = this.blend || 'screen';
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r * 5.5);
+    g.addColorStop(0, hexAlpha(this.hot || '#ffffff', alpha));
+    g.addColorStop(0.18, hexAlpha(this.color, alpha * 0.82));
+    g.addColorStop(1, hexAlpha(this.color, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r * 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = hexAlpha(this.hot || this.color, alpha);
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+class Shockwave {
+  constructor(x, y, color, maxR, life, width = 6) { Object.assign(this, {x, y, color, maxR, life, width, age: 0, dead: false}); }
+  update(dt) { this.age += dt; if (this.age > this.life) this.dead = true; }
+  draw() {
+    const t = Math.min(1, this.age / this.life);
+    const ease = 1 - Math.pow(1 - t, 3);
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.strokeStyle = hexAlpha(this.color, (1 - t) * 0.82);
+    ctx.lineWidth = this.width * (1 - t) + 1;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.maxR * ease, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+class SmokeBlob {
+  constructor(opts) { Object.assign(this, opts); this.age = 0; this.dead = false; this.spin = rand(-1, 1); }
+  update(dt) {
+    this.age += dt; if (this.age > this.life) this.dead = true;
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    this.vx *= Math.pow(0.988, dt * 60); this.vy *= Math.pow(0.982, dt * 60);
+    this.vy -= this.lift * dt;
+  }
+  draw() {
+    const t = Math.min(1, this.age / this.life);
+    const r = this.radius * (0.55 + t * this.grow);
+    const alpha = Math.sin(Math.PI * Math.min(1, t)) * (1 - t * 0.45) * this.alpha;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.spin * t);
+    const g = ctx.createRadialGradient(0, 0, r * 0.08, 0, 0, r);
+    g.addColorStop(0, hexAlpha(this.core, alpha * 0.86));
+    g.addColorStop(0.55, hexAlpha(this.color, alpha * 0.62));
+    g.addColorStop(1, hexAlpha(this.color, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * this.sx, r * this.sy, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+class WinnerFireworks {
+  constructor(bounds) { this.bounds = bounds; this.started = false; }
+  start() {
+    this.started = true;
+    flashes.push({ age: 0, life: 0.42, color: '#dffaff', alpha: 0.34 });
+    for (let i = 0; i < 5; i++) setTimeout(() => this.burst(rand(this.bounds.x + 90, this.bounds.x + this.bounds.w - 90), rand(H * 0.16, H * 0.48), 0.85 + Math.random() * 0.65), i * 180);
+    for (let i = 0; i < 80; i++) this.confetti();
+  }
+  update(t) {
+    if (t > nextFireworkAt && t < 4.7) {
+      nextFireworkAt = t + rand(0.32, 0.62);
+      this.burst(rand(this.bounds.x + 72, this.bounds.x + this.bounds.w - 72), rand(H * 0.14, H * 0.52), rand(0.75, 1.35));
+    }
+  }
+  burst(x, y, scale) {
+    const color = choice(palettes.fireworks);
+    waves.push(new Shockwave(x, y, color, 70 * scale, 0.75, 4));
+    const count = Math.floor(58 * scale);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + rand(-0.035, 0.035);
+      const speed = rand(80, 235) * scale * (i % 7 === 0 ? 1.28 : 1);
+      particles.push(new Particle({
+        x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, ay: 92, drag: 0.986,
+        life: rand(1.0, 1.9), size: rand(1.1, 2.9) * scale, color, hot: '#ffffff', trailLength: 12, fadePower: 1.8
+      }));
+    }
+    for (let i = 0; i < 16; i++) {
+      particles.push(new Particle({ x, y, vx: rand(-60, 60), vy: rand(-120, 40), ay: 130, drag: 0.992, life: rand(1.4, 2.4), size: rand(0.8, 1.8), color: '#fff8c7', hot: '#fff', trailLength: 16, alpha: 0.7 }));
+    }
+  }
+  confetti() {
+    particles.push(new Particle({
+      x: rand(this.bounds.x, this.bounds.x + this.bounds.w), y: rand(-80, H * 0.25), vx: rand(-34, 34), vy: rand(70, 185), ay: 18,
+      drag: 0.995, life: rand(2.4, 4.2), size: rand(1.8, 3.6), color: choice(palettes.fireworks), hot: choice(palettes.fireworks), blend: 'screen', trailLength: 3, alpha: 0.72
+    }));
+  }
+}
+
+class LoserNuclearExplosion {
+  constructor(bounds) { this.bounds = bounds; this.started = false; }
+  start() {
+    this.started = true;
+    const cx = this.bounds.x + this.bounds.w * 0.5;
+    const ground = H * 0.72;
+    flashes.push({ age: 0, life: 0.38, color: '#fff0c6', alpha: 0.34 });
+    waves.push(new Shockwave(cx, ground, '#fff2a6', Math.min(this.bounds.w, H) * 0.62, 1.1, 10));
+    waves.push(new Shockwave(cx, ground, '#ff6b2e', Math.min(this.bounds.w, H) * 0.92, 1.55, 5));
+    stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+
+    for (let i = 0; i < 120; i++) this.fireball(cx, ground, i / 120);
+    for (let i = 0; i < 130; i++) this.smoke(cx + rand(-90, 90), ground - rand(0, 240), rand(30, 112), i);
+    for (let i = 0; i < 70; i++) this.ash(cx, ground);
+    for (let i = 0; i < 38; i++) this.stem(cx, ground, i);
+  }
+  update(t) {
+    if (!this.started) return;
+    const cx = this.bounds.x + this.bounds.w * 0.5;
+    const ground = H * 0.72;
+    if (t < 2.8 && Math.random() < 0.18) this.smoke(cx + rand(-130, 130), ground - rand(120, 300), rand(36, 96), 0);
+  }
+  fireball(cx, cy, k) {
+    const a = rand(0, Math.PI * 2), radius = rand(10, 95) * (0.75 + k * 0.55);
+    particles.push(new Particle({
+      x: cx + Math.cos(a) * rand(0, 18), y: cy + Math.sin(a) * rand(0, 12),
+      vx: Math.cos(a) * radius * rand(1.5, 3.4), vy: Math.sin(a) * radius * rand(0.9, 2.0) - rand(40, 120),
+      ay: rand(-10, 42), drag: 0.945, life: rand(0.75, 1.5), size: rand(4, 12), grow: rand(0.4, 1.2),
+      color: choice(palettes.nuclear), hot: '#fff7d2', alpha: 0.92, trailLength: 5, fadePower: 1.1
+    }));
+  }
+  smoke(x, y, r, i) {
+    plumes.push(new SmokeBlob({
+      x, y, vx: rand(-32, 32), vy: rand(-20, 22), lift: rand(10, 42), radius: r,
+      grow: rand(1.2, 2.4), sx: rand(0.75, 1.45), sy: rand(0.72, 1.36),
+      color: choice(palettes.smoke), core: i % 4 ? '#333648' : '#ff9b3d', alpha: rand(0.32, 0.58), life: rand(3.2, 6.0)
+    }));
+  }
+  ash(cx, cy) {
+    const a = rand(-Math.PI, 0);
+    particles.push(new Particle({
+      x: cx + rand(-28, 28), y: cy + rand(-18, 12), vx: Math.cos(a) * rand(90, 360), vy: Math.sin(a) * rand(70, 240),
+      ay: rand(80, 170), drag: 0.985, life: rand(1.4, 3.2), size: rand(0.8, 2.5), color: choice(['#ffce71', '#c27142', '#8d95a3']), hot: '#fff0c0', alpha: 0.74, trailLength: 8
+    }));
+  }
+  stem(cx, ground, i) {
+    plumes.push(new SmokeBlob({
+      x: cx + rand(-34, 34), y: ground - i * 6, vx: rand(-11, 11), vy: -rand(18, 46), lift: rand(18, 42), radius: rand(28, 62),
+      grow: rand(1.1, 2.2), sx: rand(0.7, 1.1), sy: rand(1.0, 1.7), color: '#4b4f60', core: i < 8 ? '#ff7b2e' : '#333648', alpha: rand(0.34, 0.58), life: rand(3.4, 5.8)
+    }));
+  }
+}
+
+let winnerEffect = null;
+let loserEffect = null;
+
+function play(newMode) {
+  mode = newMode;
+  lastMode = newMode;
+  particles = []; flashes = []; waves = []; plumes = [];
+  startTime = performance.now(); previousTime = startTime; nextFireworkAt = 0;
+  stage.classList.remove('shake');
+
+  const left = {x: 0, y: 0, w: W * (newMode === 'both' ? bothDivider : 1), h: H};
+  const right = {x: W * bothDivider, y: 0, w: W * (1 - bothDivider), h: H};
+
+  if (newMode === 'winner') {
+    modeLabel.textContent = 'Winner Fireworks';
+    modeCopy.textContent = 'Celebratory neon bursts with glow trails, confetti, embers, and screen flash.';
+    winnerEffect = new WinnerFireworks({x: 0, y: 0, w: W, h: H}); loserEffect = null; winnerEffect.start();
+  } else if (newMode === 'loser') {
+    modeLabel.textContent = 'Loser Explosion';
+    modeCopy.textContent = 'Stylized arcade nuke: mushroom cloud, shockwave, smoke, ash, and rumble.';
+    loserEffect = new LoserNuclearExplosion({x: 0, y: 0, w: W, h: H}); winnerEffect = null; loserEffect.start();
+  } else {
+    modeLabel.textContent = 'Side-by-side Comparison';
+    modeCopy.textContent = 'Winner effect on the left, loser effect on the right for approval comparison.';
+    winnerEffect = new WinnerFireworks(left); loserEffect = new LoserNuclearExplosion(right); winnerEffect.start(); setTimeout(() => loserEffect.start(), 420);
+  }
+}
+
+function animate(now) {
+  try {
+    const dt = Math.min(0.033, Math.max(0.001, (now - previousTime) / 1000 || 0.016));
+    previousTime = now;
+    const elapsed = Math.max(0, (now - startTime) / 1000);
+    clock.textContent = elapsed.toFixed(1) + 's';
+
+    drawBackground(elapsed);
+    if (mode === 'both') drawDivider();
+
+    if (winnerEffect) winnerEffect.update(elapsed);
+    if (loserEffect) loserEffect.update(elapsed);
+
+    updateAll(dt, elapsed);
+  } catch (error) {
+    modeLabel.textContent = 'Preview error';
+    modeCopy.textContent = error && error.message ? error.message : String(error);
+    console.error(error);
+  }
+  raf = requestAnimationFrame(animate);
+}
+
+function drawBackground(t) {
+  ctx.clearRect(0, 0, W, H);
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#050715'); sky.addColorStop(0.48, '#090d20'); sky.addColorStop(1, '#17112a');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.globalAlpha = 0.42;
+  for (let i = 0; i < 70; i++) {
+    const x = (i * 97.31 + Math.sin(t * 0.05 + i) * 14) % W;
+    const y = (i * 53.73) % (H * 0.64);
+    ctx.fillStyle = i % 9 ? 'rgba(200,214,255,0.35)' : 'rgba(123,97,255,0.55)';
+    ctx.fillRect(x, y, i % 9 ? 1 : 2, i % 9 ? 1 : 2);
+  }
+  ctx.restore();
+
+  const floor = ctx.createRadialGradient(W/2, H*0.9, H*0.05, W/2, H*0.9, H*0.75);
+  floor.addColorStop(0, 'rgba(123,97,255,0.18)'); floor.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = floor; ctx.fillRect(0, 0, W, H);
+}
+
+function drawDivider() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(180,200,255,0.16)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W * bothDivider, 0); ctx.lineTo(W * bothDivider, H); ctx.stroke();
+  ctx.font = '800 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(220,225,255,0.58)';
+  ctx.fillText('WINNER', W * 0.25, 28); ctx.fillText('LOSER', W * 0.75, 28);
+  ctx.restore();
+}
+
+function updateAll(dt, elapsed) {
+  for (const f of flashes) {
+    f.age += dt;
+    const a = Math.max(0, (1 - f.age / f.life) * f.alpha);
+    ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = hexAlpha(f.color, a); ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+  flashes = flashes.filter(f => f.age < f.life);
+
+  for (const wave of waves) { wave.update(dt); wave.draw(); }
+  waves = waves.filter(w => !w.dead);
+
+  // Smoke behind sparks for mass, then sparks over smoke for premium bloom.
+  for (const blob of plumes) { blob.update(dt); blob.draw(); }
+  plumes = plumes.filter(p => !p.dead);
+
+  for (const p of particles) { p.update(dt); p.draw(); }
+  particles = particles.filter(p => !p.dead && p.x > -180 && p.x < W + 180 && p.y < H + 220);
+
+  const vignette = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.25, W/2, H/2, Math.max(W,H)*0.72);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(0,0,0,0.44)');
+  ctx.fillStyle = vignette; ctx.fillRect(0,0,W,H);
+}
+
+function hexAlpha(hex, alpha) {
+  const c = hex.replace('#', '');
+  const n = parseInt(c.length === 3 ? c.split('').map(x => x + x).join('') : c, 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, alpha))})`;
+}
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+window.addEventListener('resize', () => { resizeCanvas(); play(lastMode); });
+document.getElementById('playWinner').addEventListener('click', () => play('winner'));
+document.getElementById('playLoser').addEventListener('click', () => play('loser'));
+document.getElementById('playBoth').addEventListener('click', () => play('both'));
+document.getElementById('replay').addEventListener('click', () => play(lastMode));
+
+resizeCanvas();
+play('both');
+raf = requestAnimationFrame(animate);
+</script>
+</body>
+</html>

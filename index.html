@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vance Games</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(123, 97, 255, 0.28), transparent 32rem),
+        radial-gradient(circle at 80% 30%, rgba(78, 205, 196, 0.18), transparent 26rem),
+        #1a1a2e;
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #eee;
+    }
+
+    main {
+      width: min(920px, 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      align-items: center;
+      text-align: center;
+    }
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .eyebrow {
+      color: #a0c4ff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: clamp(2.6rem, 8vw, 5.5rem);
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+      color: #f3f0ff;
+      text-shadow: 0 16px 60px rgba(0, 0, 0, 0.38);
+    }
+
+    .subtitle {
+      max-width: 620px;
+      color: #b7b7d9;
+      font-size: clamp(1rem, 2.2vw, 1.2rem);
+      line-height: 1.6;
+    }
+
+    .games {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding: 1.25rem;
+      text-align: left;
+      color: inherit;
+      text-decoration: none;
+      background: rgba(22, 33, 62, 0.82);
+      border: 1px solid rgba(160, 196, 255, 0.18);
+      border-radius: 22px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
+      transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: -40% -20% auto auto;
+      width: 170px;
+      height: 170px;
+      border-radius: 999px;
+      background: rgba(123, 97, 255, 0.32);
+      filter: blur(2px);
+    }
+
+    .card:hover,
+    .card:focus-visible {
+      transform: translateY(-4px);
+      border-color: rgba(160, 196, 255, 0.48);
+      background: rgba(30, 32, 80, 0.92);
+      outline: none;
+    }
+
+    .icon {
+      width: 68px;
+      height: 68px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: rgba(10, 12, 30, 0.42);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 2.2rem;
+    }
+
+    .card h2 {
+      position: relative;
+      font-size: 1.55rem;
+      color: #fff;
+      margin-bottom: 0.35rem;
+    }
+
+    .card p {
+      position: relative;
+      color: #b7b7d9;
+      line-height: 1.5;
+    }
+
+    .play {
+      position: relative;
+      color: #a0c4ff;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+    }
+
+    .coming-soon {
+      opacity: 0.58;
+      cursor: default;
+    }
+
+    .coming-soon:hover,
+    .coming-soon:focus-visible {
+      transform: none;
+      border-color: rgba(160, 196, 255, 0.18);
+      background: rgba(22, 33, 62, 0.82);
+    }
+
+    footer {
+      color: #71719b;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <p class="eyebrow">Mini web games</p>
+      <h1 id="page-title">Vance Games</h1>
+      <p class="subtitle">A growing collection of simple browser games. Pick a game below and jump in.</p>
+    </section>
+
+    <section class="games" aria-label="Available games">
+      <a class="card" href="./tic-tac-toe/">
+        <div class="icon" aria-hidden="true">❌</div>
+        <div>
+          <h2>Tic Tac Toe</h2>
+          <p>Online multiplayer tic-tac-toe with shareable room codes.</p>
+        </div>
+        <span class="play">Play now →</span>
+      </a>
+
+      <article class="card coming-soon" aria-label="More games coming soon">
+        <div class="icon" aria-hidden="true">🎮</div>
+        <div>
+          <h2>More games</h2>
+          <p>New games will appear here as we add them to the collection.</p>
+        </div>
+        <span class="play">Coming soon</span>
+      </article>
+    </section>
+
+    <footer>Hosted on Firebase</footer>
+  </main>
+</body>
+</html>

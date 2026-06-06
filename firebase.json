@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "site": "islander-minigames",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}

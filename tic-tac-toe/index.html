@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe — Online</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #eee;
+    }
+
+    .screen { display: flex; flex-direction: column; align-items: center; gap: 1.2rem; }
+    .hidden { display: none !important; }
+
+    h1 { font-size: 2rem; letter-spacing: 0.1em; color: #e0e0ff; }
+    .subtitle { font-size: 0.85rem; color: #666; letter-spacing: 0.2em; text-transform: uppercase; }
+
+    /* ── Lobby ── */
+    .lobby-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.9rem;
+      margin-top: 0.5rem;
+      width: 260px;
+    }
+
+    .separator {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      width: 100%;
+      color: #555;
+      font-size: 0.85rem;
+    }
+    .separator::before, .separator::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #2d2d50;
+    }
+
+    #join-input {
+      width: 100%;
+      padding: 0.7rem 1rem;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.5em;
+      text-align: center;
+      text-transform: uppercase;
+      background: #16213e;
+      border: 2px solid #2a2a5a;
+      border-radius: 8px;
+      color: #e0e0ff;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #join-input:focus { border-color: #7b61ff; }
+    #join-input::placeholder { color: #333; letter-spacing: 0.2em; font-size: 1rem; font-weight: 400; }
+
+    .error { color: #ff6b6b; font-size: 0.88rem; min-height: 1.1rem; text-align: center; }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 0.65rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: #7b61ff; color: #fff; }
+    .btn-primary:not(:disabled):hover { background: #9b80ff; }
+    .btn-secondary { background: #1e2050; color: #bbb; }
+    .btn-secondary:not(:disabled):hover { background: #2a2a70; }
+
+    /* ── Game meta bar ── */
+    #game-meta {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.85rem;
+      color: #666;
+      letter-spacing: 0.04em;
+      align-items: center;
+    }
+    #game-meta .val { color: #a0c4ff; font-weight: 700; }
+    #symbol-display.x { color: #ff6b6b; }
+    #symbol-display.o { color: #4ecdc4; }
+
+    #copy-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #555;
+      font-size: 0.95rem;
+      padding: 0 0.25rem;
+      vertical-align: middle;
+      transition: color 0.15s;
+    }
+    #copy-btn:hover { color: #9b80ff; }
+
+    /* ── Status ── */
+    #status {
+      font-size: 1.1rem;
+      min-height: 1.7rem;
+      color: #a0c4ff;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-align: center;
+    }
+
+    /* ── Board ── */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(6, 75px);
+      grid-template-rows: repeat(6, 75px);
+      gap: 6px;
+    }
+
+    .cell {
+      width: 75px;
+      height: 75px;
+      background: #16213e;
+      border: 2px solid #2a2a5a;
+      border-radius: 8px;
+      font-size: 2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      user-select: none;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .cell.clickable { cursor: pointer; }
+    .cell.clickable:hover { background: #1e2d5a; transform: scale(1.04); }
+    .cell.x { color: #ff6b6b; }
+    .cell.o { color: #4ecdc4; }
+    .cell.win { background: #2a1e5a; border-color: #7b61ff; animation: pulse 0.45s ease; }
+
+    @keyframes pulse {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.09); }
+      100% { transform: scale(1); }
+    }
+
+    /* ── Game buttons ── */
+    .game-buttons { display: flex; gap: 0.7rem; width: 480px; }
+    .game-buttons .btn { width: auto; flex: 1; }
+  </style>
+</head>
+<body>
+
+<!-- ══ LOBBY ══ -->
+<div id="screen-lobby" class="screen">
+  <h1>Tic Tac Toe</h1>
+  <p class="subtitle">Online Multiplayer</p>
+  <div class="lobby-body">
+    <button class="btn btn-primary" id="btn-create">Create Game</button>
+    <div class="separator">or</div>
+    <input id="join-input" type="text" placeholder="CODE OR LINK"
+           autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="btn btn-secondary" id="btn-join">Join Game</button>
+    <p class="error" id="lobby-error"></p>
+  </div>
+</div>
+
+<!-- ══ GAME ══ -->
+<div id="screen-game" class="screen hidden">
+  <h1>Tic Tac Toe</h1>
+  <div id="game-meta">
+    Room: <span class="val" id="code-display">—</span>
+    <button id="copy-btn" title="Copy invite link">⧉</button>
+    &nbsp;|&nbsp;
+    You are: <span class="val" id="symbol-display">—</span>
+  </div>
+  <div id="status">Loading…</div>
+  <div id="board"></div>
+  <div class="game-buttons">
+    <button class="btn btn-primary  hidden" id="btn-rematch">Rematch</button>
+    <button class="btn btn-secondary" id="btn-leave">Leave</button>
+  </div>
+</div>
+
+<script type="module">
+  // NOTE: Make sure Firestore is enabled in your Firebase console and your
+  // security rules allow reads/writes (test mode is fine for development).
+
+  import { initializeApp }
+    from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot }
+    from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyBQL5uu_4YmRZolx2fOL_0UwQ9L1kwgkaY",
+    authDomain:        "tic-tac-toe-138c5.firebaseapp.com",
+    projectId:         "tic-tac-toe-138c5",
+    storageBucket:     "tic-tac-toe-138c5.firebasestorage.app",
+    messagingSenderId: "1054673771679",
+    appId:             "1:1054673771679:web:9e5e04bf5890e50c3f96aa"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
+  const WIN_LINES = (() => {
+    const SIZE = 6, STREAK = 4, lines = [];
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const seq = (dr, dc) => Array.from({ length: STREAK }, (_, k) => (r + k * dr) * SIZE + c + k * dc);
+        if (c + STREAK <= SIZE)                       lines.push(seq(0,  1)); // horizontal
+        if (r + STREAK <= SIZE)                       lines.push(seq(1,  0)); // vertical
+        if (r + STREAK <= SIZE && c + STREAK <= SIZE) lines.push(seq(1,  1)); // diagonal ↘
+        if (r + STREAK <= SIZE && c - STREAK >= -1)   lines.push(seq(1, -1)); // diagonal ↙
+      }
+    }
+    return lines;
+  })();
+
+  // ── State ──────────────────────────────────────────────
+  let mySymbol  = null;   // 'X' | 'O'
+  let roomCode  = null;
+  let unsubscribe = null;
+  let gameData  = null;
+
+  // ── Element refs ───────────────────────────────────────
+  const $lobby      = document.getElementById('screen-lobby');
+  const $game       = document.getElementById('screen-game');
+  const $lobbyErr   = document.getElementById('lobby-error');
+  const $codeDisp   = document.getElementById('code-display');
+  const $symbolDisp = document.getElementById('symbol-display');
+  const $status     = document.getElementById('status');
+  const $board      = document.getElementById('board');
+  const $btnRematch = document.getElementById('btn-rematch');
+  const $joinInput  = document.getElementById('join-input');
+  const $btnCreate  = document.getElementById('btn-create');
+  const $btnJoin    = document.getElementById('btn-join');
+
+  // ── Lobby events ───────────────────────────────────────
+  $joinInput.addEventListener('input', () => {
+    $lobbyErr.textContent = '';
+  });
+
+  $btnCreate.addEventListener('click', createGame);
+
+  $btnJoin.addEventListener('click', () => {
+    const rawJoinValue = $joinInput.value.trim();
+    const code = extractRoomCode(rawJoinValue);
+    if (code.length !== 4) { $lobbyErr.textContent = 'Enter a 4-letter room code.'; return; }
+    joinGame(code);
+  });
+
+  document.getElementById('btn-rematch').addEventListener('click', rematch);
+  document.getElementById('btn-leave').addEventListener('click', leave);
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(buildInviteUrl(roomCode)).catch(() => {});
+  });
+
+  handleInviteLink();
+
+  // ── Create a new game room ─────────────────────────────
+  async function createGame() {
+    setLobbyBusy(true);
+
+    let code = null;
+    for (let i = 0; i < 10; i++) {
+      const candidate = randomCode();
+      const snap = await getDoc(doc(db, 'rooms', candidate)).catch(() => null);
+      if (snap && !snap.exists()) { code = candidate; break; }
+    }
+    if (!code) {
+      $lobbyErr.textContent = 'Could not create a room. Try again.';
+      setLobbyBusy(false);
+      return;
+    }
+
+    roomCode = code;
+    mySymbol = 'X';
+
+    await setDoc(doc(db, 'rooms', code), {
+      board:       Array(36).fill(''),
+      currentTurn: 'X',
+      xJoined:     true,
+      oJoined:     false,
+      winner:      null,
+      status:      'waiting'
+    });
+
+    setLobbyBusy(false);
+    showGameScreen();
+    subscribeToRoom(code);
+  }
+
+  // ── Join an existing room ──────────────────────────────
+  async function joinGame(code) {
+    setLobbyBusy(true);
+
+    const ref  = doc(db, 'rooms', code);
+    const snap = await getDoc(ref).catch(() => null);
+
+    if (!snap) {
+      $lobbyErr.textContent = 'Connection error. Check your internet and try again.';
+      setLobbyBusy(false);
+      return;
+    }
+    if (!snap.exists()) {
+      $lobbyErr.textContent = `Room "${code}" not found. Check the code and try again.`;
+      setLobbyBusy(false);
+      return;
+    }
+
+    const data = snap.data();
+    if (data.oJoined) {
+      $lobbyErr.textContent = 'This room is already full.';
+      setLobbyBusy(false);
+      return;
+    }
+
+    roomCode = code;
+    mySymbol = 'O';
+
+    await updateDoc(ref, { oJoined: true, status: 'playing' });
+
+    setLobbyBusy(false);
+    showGameScreen();
+    subscribeToRoom(code);
+  }
+
+  // ── Firestore real-time listener ───────────────────────
+  function subscribeToRoom(code) {
+    unsubscribe = onSnapshot(doc(db, 'rooms', code), snap => {
+      if (!snap.exists()) return;
+      gameData = snap.data();
+      renderGame(gameData);
+    });
+  }
+
+  // ── Render the current game state ──────────────────────
+  function renderGame(data) {
+    const waiting    = !data.oJoined;
+    const finished   = data.status === 'finished';
+    const myTurn     = !waiting && !finished && data.currentTurn === mySymbol;
+
+    // Status line
+    if (waiting) {
+      $status.textContent = `Room ${roomCode} — waiting for opponent to join…`;
+    } else if (finished) {
+      if      (data.winner === 'draw')     $status.textContent = "It's a draw!";
+      else if (data.winner === mySymbol)   $status.textContent = 'You win!';
+      else                                 $status.textContent = 'Opponent wins!';
+    } else {
+      $status.textContent = myTurn ? `Your turn (${mySymbol})` : `Opponent's turn…`;
+    }
+
+    $btnRematch.classList.toggle('hidden', !finished);
+
+    const winLine = finished ? findWinLine(data.board) : null;
+    renderBoard(data.board, winLine, myTurn);
+  }
+
+  function renderBoard(board, winLine, myTurn) {
+    $board.innerHTML = '';
+    board.forEach((val, i) => {
+      const cell = document.createElement('div');
+      const winning = winLine && winLine.includes(i);
+      cell.className = [
+        'cell',
+        val ? val.toLowerCase() : '',
+        winning ? 'win' : '',
+        (!val && myTurn) ? 'clickable' : ''
+      ].filter(Boolean).join(' ');
+      cell.textContent = val;
+      if (!val && myTurn) cell.addEventListener('click', () => handleMove(i));
+      $board.appendChild(cell);
+    });
+  }
+
+  // ── Make a move ────────────────────────────────────────
+  async function handleMove(index) {
+    if (!gameData)                              return;
+    if (gameData.currentTurn !== mySymbol)      return;
+    if (gameData.board[index] !== '')           return;
+    if (gameData.status !== 'playing')          return;
+
+    const newBoard = [...gameData.board];
+    newBoard[index] = mySymbol;
+
+    const winner = checkWinner(newBoard);
+    const isDraw = !winner && newBoard.every(v => v !== '');
+
+    const updates = {
+      board:       newBoard,
+      currentTurn: mySymbol === 'X' ? 'O' : 'X'
+    };
+    if (winner) { updates.winner = winner; updates.status = 'finished'; }
+    else if (isDraw) { updates.winner = 'draw'; updates.status = 'finished'; }
+
+    await updateDoc(doc(db, 'rooms', roomCode), updates);
+  }
+
+  // ── Rematch: reset the shared board ───────────────────
+  async function rematch() {
+    await updateDoc(doc(db, 'rooms', roomCode), {
+      board:       Array(36).fill(''),
+      currentTurn: 'X',
+      winner:      null,
+      status:      'playing'
+    });
+  }
+
+  // ── Leave: back to lobby ───────────────────────────────
+  function leave() {
+    if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+    mySymbol = roomCode = gameData = null;
+    $joinInput.value = '';
+    $lobbyErr.textContent = '';
+    $game.classList.add('hidden');
+    $lobby.classList.remove('hidden');
+  }
+
+  // ── Helpers ────────────────────────────────────────────
+  function randomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+
+  function checkWinner(board) {
+    for (const line of WIN_LINES) {
+      const first = board[line[0]];
+      if (first && line.every(i => board[i] === first)) return first;
+    }
+    return null;
+  }
+
+  function findWinLine(board) {
+    return WIN_LINES.find(line => {
+      const first = board[line[0]];
+      return first && line.every(i => board[i] === first);
+    }) ?? null;
+  }
+
+  function showGameScreen() {
+    $codeDisp.textContent = roomCode;
+    $symbolDisp.textContent = mySymbol;
+    $symbolDisp.className = mySymbol === 'X' ? 'val x' : 'val o';
+    $lobby.classList.add('hidden');
+    $game.classList.remove('hidden');
+  }
+
+  function setLobbyBusy(busy) {
+    $btnCreate.disabled = busy;
+    $btnJoin.disabled   = busy;
+  }
+
+  function handleInviteLink() {
+    const params = new URLSearchParams(window.location.search);
+    const inviteCode = extractRoomCode(params.get('room') || params.get('code') || params.get('join') || '');
+    if (inviteCode.length !== 4) return;
+
+    $joinInput.value = inviteCode;
+    joinGame(inviteCode);
+  }
+
+  function buildInviteUrl(code) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', code);
+    return url.toString();
+  }
+
+  function extractRoomCode(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+
+    try {
+      const parsed = new URL(value, window.location.href);
+      const fromUrl = parsed.searchParams.get('room') || parsed.searchParams.get('code') || parsed.searchParams.get('join');
+      if (fromUrl) return normalizeRoomCode(fromUrl);
+    } catch (_) {}
+
+    return normalizeRoomCode(value);
+  }
+
+  function normalizeRoomCode(value) {
+    return String(value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+  }
+</script>
+</body>
+</html>

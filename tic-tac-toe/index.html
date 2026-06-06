@@ -210,14 +210,13 @@
 
 <canvas id="ending-effects-canvas" aria-hidden="true"></canvas>
 
-<script type="module">
+<script>
+(async () => {
   // NOTE: Make sure Firestore is enabled in your Firebase console and your
   // security rules allow reads/writes (test mode is fine for development).
 
-  import { initializeApp }
-    from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-  import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot }
-    from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+  const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js');
+  const { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js');
 
   const firebaseConfig = {
     apiKey:            "AIzaSyBQL5uu_4YmRZolx2fOL_0UwQ9L1kwgkaY",
@@ -633,7 +632,7 @@
       c.waves.push(new EndingWave(x, y, '#ff6b2e', Math.min(c.W, c.H) * 0.72, 1.55, 5));
       for (let i = 0; i < 170; i++) {
         const a = endingRand(0, Math.PI * 2), speed = endingRand(80, 330), up = endingRand(20, 135);
-        c.particles.push(new EndingParticle({x: x + endingRand(-16, 16), y: y + endingRand(-8, 12), vx: Math.cos(a) * speed, vy: Math.sin(a) * speed * 0.55 - up, ay: endingRand(20, 110), drag: 0.955, life: endingRand(0.85, 2.5), size: endingRand(3, 10), grow: endingRand(0.4, 1.4), color: endingChoice(['#fff3b0', '#ffcf56', '#ff8a3d', '#ff4d2e', '#6b7280']), hot: '#fff7d2', trailLength: 5});
+        c.particles.push(new EndingParticle({x: x + endingRand(-16, 16), y: y + endingRand(-8, 12), vx: Math.cos(a) * speed, vy: Math.sin(a) * speed * 0.55 - up, ay: endingRand(20, 110), drag: 0.955, life: endingRand(0.85, 2.5), size: endingRand(3, 10), grow: endingRand(0.4, 1.4), color: endingChoice(['#fff3b0', '#ffcf56', '#ff8a3d', '#ff4d2e', '#6b7280']), hot: '#fff7d2', trailLength: 5}));
       }
     }
     update(t) {
@@ -681,6 +680,7 @@
   function endingChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
   window.__playEndingEffectForTest = playEndingEffect;
+})();
 
 </script>
 </body>

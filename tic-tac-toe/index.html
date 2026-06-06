@@ -160,6 +160,19 @@
     /* ── Game buttons ── */
     .game-buttons { display: flex; gap: 0.7rem; width: 480px; }
     .game-buttons .btn { width: auto; flex: 1; }
+
+    /* ── Endgame canvas effects ── */
+    #ending-effects-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.28s ease;
+    }
+    #ending-effects-canvas.active { opacity: 1; }
   </style>
 </head>
 <body>
@@ -194,6 +207,8 @@
     <button class="btn btn-secondary" id="btn-leave">Leave</button>
   </div>
 </div>
+
+<canvas id="ending-effects-canvas" aria-hidden="true"></canvas>
 
 <script type="module">
   // NOTE: Make sure Firestore is enabled in your Firebase console and your
@@ -235,6 +250,8 @@
   let roomCode  = null;
   let unsubscribe = null;
   let gameData  = null;
+  let lastEndingEffectKey = null;
+  let endingEffectsController = null;
 
   // ── Element refs ───────────────────────────────────────
   const $lobby      = document.getElementById('screen-lobby');
@@ -248,6 +265,7 @@
   const $joinInput  = document.getElementById('join-input');
   const $btnCreate  = document.getElementById('btn-create');
   const $btnJoin    = document.getElementById('btn-join');
+  const $endingCanvas = document.getElementById('ending-effects-canvas');
 
   // ── Lobby events ───────────────────────────────────────
   $joinInput.addEventListener('input', () => {
@@ -263,7 +281,7 @@
     joinGame(code);
   });
 
-  document.getElementById('btn-rematch').addEventListener('click', rematch);
+  document.getElementById('btn-rematch').addEventListener('click', requestRematch);
   document.getElementById('btn-leave').addEventListener('click', leave);
   document.getElementById('copy-btn').addEventListener('click', () => {
     navigator.clipboard.writeText(buildInviteUrl(roomCode)).catch(() => {});
@@ -296,7 +314,10 @@
       xJoined:     true,
       oJoined:     false,
       winner:      null,
-      status:      'waiting'
+      status:      'waiting',
+      rematchRequests: { X: false, O: false },
+      nextFirstPlayer: 'O',
+      gameNumber: 1
     });
 
     setLobbyBusy(false);
@@ -354,6 +375,8 @@
     const finished   = data.status === 'finished';
     const myTurn     = !waiting && !finished && data.currentTurn === mySymbol;
 
+    if (!finished) lastEndingEffectKey = null;
+
     // Status line
     if (waiting) {
       $status.textContent = `Room ${roomCode} — waiting for opponent to join…`;
@@ -366,9 +389,18 @@
     }
 
     $btnRematch.classList.toggle('hidden', !finished);
+    if (finished) {
+      const requests = data.rematchRequests || {};
+      $btnRematch.disabled = !!requests[mySymbol];
+      $btnRematch.textContent = requests[mySymbol] ? 'Waiting for opponent…' : 'Play Again';
+    } else {
+      $btnRematch.disabled = false;
+      $btnRematch.textContent = 'Play Again';
+    }
 
     const winLine = finished ? findWinLine(data.board) : null;
     renderBoard(data.board, winLine, myTurn);
+    maybePlayEndingEffect(data);
   }
 
   function renderBoard(board, winLine, myTurn) {
@@ -411,14 +443,31 @@
     await updateDoc(doc(db, 'rooms', roomCode), updates);
   }
 
-  // ── Rematch: reset the shared board ───────────────────
-  async function rematch() {
-    await updateDoc(doc(db, 'rooms', roomCode), {
-      board:       Array(36).fill(''),
-      currentTurn: 'X',
-      winner:      null,
-      status:      'playing'
-    });
+  // ── Rematch: both players request; first player alternates ─────────
+  async function requestRematch() {
+    if (!roomCode || !mySymbol) return;
+
+    const ref = doc(db, 'rooms', roomCode);
+    const snap = await getDoc(ref).catch(() => null);
+    if (!snap || !snap.exists()) return;
+
+    const data = snap.data();
+    const nextFirstPlayer = data.nextFirstPlayer || 'O';
+    const rematchRequests = { ...(data.rematchRequests || {}), [mySymbol]: true };
+
+    if (rematchRequests[otherSymbol(mySymbol)]) {
+      await updateDoc(ref, {
+        board:       Array(36).fill(''),
+        currentTurn: nextFirstPlayer,
+        winner:      null,
+        status:      'playing',
+        rematchRequests: { X: false, O: false },
+        nextFirstPlayer: otherSymbol(nextFirstPlayer),
+        gameNumber: (data.gameNumber || 1) + 1
+      });
+    } else {
+      await updateDoc(ref, { rematchRequests });
+    }
   }
 
   // ── Leave: back to lobby ───────────────────────────────
@@ -431,10 +480,30 @@
     $lobby.classList.remove('hidden');
   }
 
+  function maybePlayEndingEffect(data) {
+    if (!data || data.status !== 'finished' || !data.winner) return;
+    const effectKey = `${roomCode}:${data.gameNumber || 1}:${data.winner}:${data.board.join('')}`;
+    if (effectKey === lastEndingEffectKey) return;
+    lastEndingEffectKey = effectKey;
+    const effect = data.winner === 'draw' ? 'tie' : data.winner === mySymbol ? 'winner' : 'loser';
+    playEndingEffect(effect);
+  }
+
+  function playEndingEffect(effect) {
+    if (!endingEffectsController) endingEffectsController = new EndingEffectsController($endingCanvas);
+    if (effect === 'winner') endingEffectsController.playEndingEffect('winner');
+    else if (effect === 'loser') endingEffectsController.playEndingEffect('loser');
+    else if (effect === 'tie') endingEffectsController.playEndingEffect('tie');
+  }
+
   // ── Helpers ────────────────────────────────────────────
   function randomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
     return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+
+  function otherSymbol(symbol) {
+    return symbol === 'X' ? 'O' : 'X';
   }
 
   function checkWinner(board) {
@@ -496,6 +565,123 @@
   function normalizeRoomCode(value) {
     return String(value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
   }
+
+
+  // ── Endgame animation effects ──────────────────────────
+  class EndingParticle {
+    constructor(opts) { Object.assign(this, opts); this.age = 0; this.dead = false; this.trail = []; }
+    update(dt) {
+      this.age += dt; if (this.age >= this.life) this.dead = true;
+      this.trail.push([this.x, this.y]); if (this.trail.length > (this.trailLength || 8)) this.trail.shift();
+      this.vx += (this.ax || 0) * dt; this.vy += (this.ay || 0) * dt;
+      this.x += this.vx * dt; this.y += this.vy * dt;
+      const drag = Math.pow(this.drag || 0.99, dt * 60); this.vx *= drag; this.vy *= drag;
+    }
+    draw(ctx) {
+      const t = Math.min(1, this.age / this.life);
+      const alpha = Math.max(0, Math.pow(1 - t, this.fadePower || 1.4)) * (this.alpha || 1);
+      if (alpha <= 0) return;
+      ctx.save(); ctx.globalCompositeOperation = this.blend || 'screen'; ctx.lineCap = 'round';
+      if (this.trail.length > 1) {
+        for (let i = 1; i < this.trail.length; i++) {
+          ctx.strokeStyle = endingRgba(this.color, alpha * (i / this.trail.length) * 0.44);
+          ctx.lineWidth = Math.max(0.5, (this.size || 2) * i / this.trail.length);
+          ctx.beginPath(); ctx.moveTo(this.trail[i - 1][0], this.trail[i - 1][1]); ctx.lineTo(this.trail[i][0], this.trail[i][1]); ctx.stroke();
+        }
+      }
+      const r = Math.max(0.5, (this.size || 2) * (this.grow ? 0.45 + t * this.grow : 1));
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r * 5);
+      g.addColorStop(0, endingRgba(this.hot || '#ffffff', alpha));
+      g.addColorStop(0.22, endingRgba(this.color, alpha * 0.82));
+      g.addColorStop(1, endingRgba(this.color, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(this.x, this.y, r * 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = endingRgba(this.hot || this.color, alpha); ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class EndingWave {
+    constructor(x, y, color, maxR, life, width = 5) { Object.assign(this, {x, y, color, maxR, life, width, age: 0, dead: false}); }
+    update(dt) { this.age += dt; if (this.age >= this.life) this.dead = true; }
+    draw(ctx) {
+      const t = Math.min(1, this.age / this.life), ease = 1 - Math.pow(1 - t, 3);
+      ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.strokeStyle = endingRgba(this.color, (1 - t) * 0.82);
+      ctx.lineWidth = this.width * (1 - t) + 1; ctx.beginPath(); ctx.arc(this.x, this.y, this.maxR * ease, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+  }
+
+  class WinnerFireworksEffect {
+    constructor(controller) { this.c = controller; this.nextBurstAt = 0; }
+    start() { for (let i = 0; i < 6; i++) setTimeout(() => this.burst(endingRand(0.18, 0.82), endingRand(0.14, 0.46), endingRand(0.8, 1.3)), i * 190); }
+    update(t) { if (t > this.nextBurstAt && t < 4.2) { this.nextBurstAt = t + endingRand(0.34, 0.62); this.burst(endingRand(0.15, 0.85), endingRand(0.14, 0.52), endingRand(0.8, 1.35)); } }
+    burst(px, py, scale) {
+      const c = this.c, x = c.W * px, y = c.H * py, color = endingChoice(['#7b61ff', '#4ecdc4', '#ffd166', '#ff6b9d', '#a0c4ff']);
+      c.waves.push(new EndingWave(x, y, color, 76 * scale, 0.78, 4));
+      const count = Math.floor(56 * scale);
+      for (let i = 0; i < count; i++) {
+        const a = Math.PI * 2 * i / count + endingRand(-0.04, 0.04), speed = endingRand(85, 240) * scale;
+        c.particles.push(new EndingParticle({x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, ay: 98, drag: 0.986, life: endingRand(1.0, 1.85), size: endingRand(1.1, 2.8) * scale, color, hot: '#fff', trailLength: 12}));
+      }
+    }
+  }
+
+  class LoserExplosionEffect {
+    constructor(controller) { this.c = controller; }
+    start() {
+      const c = this.c, x = c.W * 0.5, y = c.H * 0.62;
+      c.waves.push(new EndingWave(x, y, '#fff2a6', Math.min(c.W, c.H) * 0.46, 1.1, 9));
+      c.waves.push(new EndingWave(x, y, '#ff6b2e', Math.min(c.W, c.H) * 0.72, 1.55, 5));
+      for (let i = 0; i < 170; i++) {
+        const a = endingRand(0, Math.PI * 2), speed = endingRand(80, 330), up = endingRand(20, 135);
+        c.particles.push(new EndingParticle({x: x + endingRand(-16, 16), y: y + endingRand(-8, 12), vx: Math.cos(a) * speed, vy: Math.sin(a) * speed * 0.55 - up, ay: endingRand(20, 110), drag: 0.955, life: endingRand(0.85, 2.5), size: endingRand(3, 10), grow: endingRand(0.4, 1.4), color: endingChoice(['#fff3b0', '#ffcf56', '#ff8a3d', '#ff4d2e', '#6b7280']), hot: '#fff7d2', trailLength: 5});
+      }
+    }
+    update(t) {
+      const c = this.c, x = c.W * 0.5, y = c.H * 0.46;
+      if (t < 3.0 && Math.random() < 0.34) c.particles.push(new EndingParticle({x: x + endingRand(-130, 130), y: y + endingRand(-40, 150), vx: endingRand(-18, 18), vy: endingRand(-32, 10), ay: -18, drag: 0.99, life: endingRand(2.2, 4.4), size: endingRand(8, 22), grow: endingRand(1.0, 2.2), color: endingChoice(['#596070', '#81858f', '#34384b']), hot: '#ff9b3d', blend: 'source-over', alpha: 0.48, trailLength: 1}));
+    }
+  }
+
+  class TieCosmicStalemateEffect {
+    constructor(controller) { this.c = controller; }
+    start() {
+      const c = this.c, x = c.W * 0.5, y = c.H * 0.43;
+      c.waves.push(new EndingWave(x, y, '#69e7ff', Math.min(c.W, c.H) * 0.42, 1.35, 5));
+      c.waves.push(new EndingWave(x, y, '#b39cff', Math.min(c.W, c.H) * 0.58, 2.1, 3));
+      for (let i = 0; i < 110; i++) this.stardust();
+    }
+    stardust() {
+      const c = this.c, a = endingRand(0, Math.PI * 2), r = endingRand(18, Math.min(c.W, c.H) * 0.32);
+      c.particles.push(new EndingParticle({x: c.W * 0.5 + Math.cos(a) * r, y: c.H * 0.43 + Math.sin(a) * r * 0.7, vx: -Math.sin(a) * endingRand(12, 46), vy: Math.cos(a) * endingRand(10, 34), ay: endingRand(-8, 8), drag: 0.992, life: endingRand(1.8, 3.8), size: endingRand(0.8, 2.4), color: endingChoice(['#69e7ff', '#b39cff', '#f7d3ff', '#d8fff8']), hot: '#fff', trailLength: 9, alpha: 0.82}));
+    }
+    update(t) {
+      const c = this.c, ctx = c.ctx, cx = c.W * 0.5, cy = c.H * 0.43;
+      const progress = Math.min(1, t / 2.65), ease = 1 - Math.pow(1 - progress, 3), orbit = Math.max(42, Math.min(c.W, c.H) * (0.29 - ease * 0.14));
+      const angle = t * (2.8 + ease * 3.4);
+      this.symbol('X', cx + Math.cos(angle) * orbit, cy + Math.sin(angle) * orbit * 0.44, '#69e7ff', 50 + ease * 16, angle);
+      this.symbol('O', cx + Math.cos(angle + Math.PI) * orbit, cy + Math.sin(angle + Math.PI) * orbit * 0.44, '#f7d3ff', 50 + ease * 16, -angle * 0.7);
+      if (t > 2.1) this.emblem(Math.min(1, (t - 2.1) / 1.1));
+      if (t > 2.75) this.text(Math.min(1, (t - 2.75) / 0.9));
+      if (t < 3.1 && Math.random() < 0.18) this.stardust();
+    }
+    symbol(symbol, x, y, color, size, rot) { const ctx = this.c.ctx; ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.translate(x, y); ctx.rotate(rot); ctx.font = `950 ${size}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.shadowColor = color; ctx.shadowBlur = 24; ctx.fillStyle = endingRgba(color, 0.92); ctx.fillText(symbol, 0, 0); ctx.restore(); }
+    emblem(alpha) { const c = this.c, ctx = c.ctx, cx = c.W * 0.5, cy = c.H * 0.43, r = Math.min(c.W, c.H) * 0.11; ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = alpha; const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.4); g.addColorStop(0, 'rgba(255,255,255,0.48)'); g.addColorStop(0.3, 'rgba(105,231,255,0.32)'); g.addColorStop(1, 'rgba(105,231,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r * 2.4, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    text(alpha) { const c = this.c, ctx = c.ctx; ctx.save(); ctx.globalAlpha = alpha; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.shadowColor = '#69e7ff'; ctx.shadowBlur = 20; ctx.font = `900 ${Math.max(28, Math.min(c.W, c.H) * 0.065)}px system-ui`; ctx.fillStyle = '#f3f0ff'; ctx.fillText('Cosmic Stalemate', c.W * 0.5, c.H * 0.68); ctx.font = `800 ${Math.max(14, Math.min(c.W, c.H) * 0.026)}px system-ui`; ctx.fillStyle = '#d8fff8'; ctx.fillText('Perfectly matched', c.W * 0.5, c.H * 0.74); ctx.restore(); }
+  }
+
+  class EndingEffectsController {
+    constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.W = 1; this.H = 1; this.dpr = 1; this.particles = []; this.waves = []; this.effect = null; this.startedAt = 0; this.previous = 0; this.raf = null; this.resize(); window.addEventListener('resize', () => this.resize()); }
+    resize() { this.dpr = Math.min(window.devicePixelRatio || 1, 2); this.W = window.innerWidth; this.H = window.innerHeight; this.canvas.width = Math.floor(this.W * this.dpr); this.canvas.height = Math.floor(this.H * this.dpr); this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); }
+    playEndingEffect(effect) { this.resize(); this.canvas.classList.add('active'); this.particles = []; this.waves = []; this.startedAt = performance.now(); this.previous = this.startedAt; this.effect = effect === 'winner' ? new WinnerFireworksEffect(this) : effect === 'loser' ? new LoserExplosionEffect(this) : new TieCosmicStalemateEffect(this); this.effect.start(); if (!this.raf) this.raf = requestAnimationFrame(now => this.animate(now)); setTimeout(() => this.canvas.classList.remove('active'), 5200); }
+    animate(now) { const dt = Math.min(0.033, Math.max(0.001, (now - this.previous) / 1000 || 0.016)); this.previous = now; const elapsed = Math.max(0, (now - this.startedAt) / 1000); this.ctx.clearRect(0, 0, this.W, this.H); if (this.effect && elapsed < 5.4) this.effect.update(elapsed); for (const w of this.waves) { w.update(dt); w.draw(this.ctx); } this.waves = this.waves.filter(w => !w.dead); for (const p of this.particles) { p.update(dt); p.draw(this.ctx); } this.particles = this.particles.filter(p => !p.dead && p.x > -180 && p.x < this.W + 180 && p.y > -180 && p.y < this.H + 220); if (elapsed > 5.6 && !this.particles.length && !this.waves.length) { this.raf = null; this.ctx.clearRect(0, 0, this.W, this.H); return; } this.raf = requestAnimationFrame(t => this.animate(t)); }
+  }
+
+  function endingRgba(hex, alpha) { const c = hex.replace('#', ''); const n = parseInt(c.length === 3 ? c.split('').map(x => x + x).join('') : c, 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${Math.max(0, Math.min(1, alpha))})`; }
+  function endingRand(min, max) { return Math.random() * (max - min) + min; }
+  function endingChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  window.__playEndingEffectForTest = playEndingEffect;
+
 </script>
 </body>
 </html>

@@ -16,6 +16,7 @@ class AnimationPreviewTests(unittest.TestCase):
         for text in [
             "Play Winner Fireworks",
             "Play Loser Explosion",
+            "Play Tie Stalemate",
             "Side-by-side",
             "Replay",
         ]:
@@ -25,10 +26,20 @@ class AnimationPreviewTests(unittest.TestCase):
         for name in [
             "class WinnerFireworks",
             "class LoserNuclearExplosion",
+            "class TieCosmicStalemate",
             "function play(newMode)",
             "requestAnimationFrame(animate)",
         ]:
             self.assertIn(name, self.source)
+
+    def test_tie_animation_has_cosmic_stalemate_direction(self):
+        for phrase in [
+            "Cosmic Stalemate",
+            "Perfectly matched",
+            "glowing X and O",
+            "balanced eclipse",
+        ]:
+            self.assertIn(phrase, self.source)
 
     def test_preview_is_standalone_vanilla_canvas(self):
         self.assertIn("<canvas id=\"effectsCanvas\"></canvas>", self.source)

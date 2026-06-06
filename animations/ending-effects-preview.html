@@ -14,6 +14,7 @@
       --muted: #9aa0c7;
       --win: #9b80ff;
       --lose: #ff8a3d;
+      --tie: #69e7ff;
     }
 
     * { box-sizing: border-box; }
@@ -50,6 +51,7 @@
     button:active { transform: translateY(0) scale(0.98); }
     .btn-win { background: linear-gradient(135deg, #7b61ff, #4ecdc4); }
     .btn-lose { background: linear-gradient(135deg, #ff4d2e, #ffb03d); }
+    .btn-tie { background: linear-gradient(135deg, #69e7ff, #b39cff 55%, #f7d3ff); color: #08101f; }
     .btn-both { background: linear-gradient(135deg, #7b61ff, #ff8a3d); }
 
     .stage {
@@ -99,13 +101,14 @@
   <main class="page">
     <header>
       <div class="eyebrow">Tic Tac Toe ending effects</div>
-      <h1>Winner + Loser Animation Preview</h1>
+      <h1>Winner + Loser + Tie Animation Preview</h1>
       <p class="subtitle">Standalone approval page. These are canvas effects only — nothing has been integrated into the live game yet.</p>
     </header>
 
     <nav class="toolbar" aria-label="Animation controls">
       <button class="btn-win" id="playWinner">Play Winner Fireworks</button>
       <button class="btn-lose" id="playLoser">Play Loser Explosion</button>
+      <button class="btn-tie" id="playTie">Play Tie Stalemate</button>
       <button class="btn-both" id="playBoth">Side-by-side</button>
       <button id="replay">Replay</button>
     </nav>
@@ -115,7 +118,7 @@
       <div class="hud">
         <div class="badge">
           <strong id="modeLabel">Ready</strong>
-          <span id="modeCopy">Choose an effect to preview the victory and defeat treatments.</span>
+          <span id="modeCopy">Choose an effect to preview the victory, defeat, and tie treatments.</span>
         </div>
         <div class="status-pill" id="clock">0.0s</div>
       </div>
@@ -124,6 +127,7 @@
     <section class="notes">
       <div class="note"><b>Winner direction:</b> layered fireworks, neon bloom, glitter embers, celebratory confetti, and a quick luminous flash.</div>
       <div class="note"><b>Loser direction:</b> stylized arcade mushroom cloud, shockwave, smoke/ash, heat glow, and brief screen rumble — dramatic but cartoon-safe.</div>
+      <div class="note"><b>Tie direction:</b> Cosmic Stalemate with glowing X and O symbols, orbital tension, a balanced eclipse, stardust, and “Perfectly matched” resolution.</div>
     </section>
   </main>
 
@@ -156,6 +160,7 @@ let bothDivider = 0.5;
 const palettes = {
   fireworks: ['#7b61ff', '#4ecdc4', '#ffd166', '#ff6b9d', '#a0c4ff', '#f7f1ff'],
   nuclear: ['#fff3b0', '#ffcf56', '#ff8a3d', '#ff4d2e', '#9a3412', '#6b7280'],
+  tie: ['#69e7ff', '#b39cff', '#f7d3ff', '#d8fff8', '#8ea7ff'],
   smoke: ['#36384d', '#596070', '#81858f', '#2a2d3d', '#b0a99d']
 };
 
@@ -361,13 +366,129 @@ class LoserNuclearExplosion {
   }
 }
 
+class TieCosmicStalemate {
+  constructor(bounds) { this.bounds = bounds; this.started = false; this.cx = 0; this.cy = 0; }
+  start() {
+    this.started = true;
+    this.cx = this.bounds.x + this.bounds.w * 0.5;
+    this.cy = H * 0.48;
+    flashes.push({ age: 0, life: 0.48, color: '#d8fff8', alpha: 0.22 });
+    waves.push(new Shockwave(this.cx, this.cy, '#69e7ff', Math.min(this.bounds.w, H) * 0.52, 1.35, 5));
+    waves.push(new Shockwave(this.cx, this.cy, '#b39cff', Math.min(this.bounds.w, H) * 0.72, 2.2, 3));
+    for (let i = 0; i < 120; i++) this.stardust(i);
+  }
+  update(t) {
+    if (!this.started) return;
+    this.drawBoard(t);
+    this.drawOrbit(t);
+    this.drawBalanceEmblem(t);
+    this.drawText(t);
+    if (t < 3.2 && Math.random() < 0.18) this.stardust(Math.floor(t * 60));
+  }
+  stardust(i) {
+    const a = rand(0, Math.PI * 2);
+    const r = rand(18, Math.min(this.bounds.w, H) * 0.38);
+    particles.push(new Particle({
+      x: this.cx + Math.cos(a) * r, y: this.cy + Math.sin(a) * r * 0.72,
+      vx: -Math.sin(a) * rand(12, 46), vy: Math.cos(a) * rand(10, 34),
+      ay: rand(-8, 8), drag: 0.992, life: rand(1.8, 3.8), size: rand(0.8, 2.4),
+      color: choice(palettes.tie), hot: '#ffffff', trailLength: 9, alpha: i % 5 ? 0.7 : 1
+    }));
+  }
+  drawBoard(t) {
+    const size = Math.min(this.bounds.w * 0.42, H * 0.44, 250);
+    const x = this.cx - size / 2, y = H * 0.58 - size / 2;
+    const glow = 0.34 + Math.sin(t * 3.2) * 0.08;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.strokeStyle = `rgba(105,231,255,${glow})`;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = '#69e7ff'; ctx.shadowBlur = 20;
+    for (let i = 1; i <= 2; i++) {
+      ctx.beginPath(); ctx.moveTo(x + size * i / 3, y); ctx.lineTo(x + size * i / 3, y + size); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, y + size * i / 3); ctx.lineTo(x + size, y + size * i / 3); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  drawOrbit(t) {
+    const progress = Math.min(1, t / 2.65);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    const orbit = Math.max(48, Math.min(this.bounds.w, H) * (0.34 - ease * 0.18));
+    const angle = t * (2.8 + ease * 3.4);
+    const x1 = this.cx + Math.cos(angle) * orbit;
+    const y1 = this.cy + Math.sin(angle) * orbit * 0.42;
+    const x2 = this.cx + Math.cos(angle + Math.PI) * orbit;
+    const y2 = this.cy + Math.sin(angle + Math.PI) * orbit * 0.42;
+    this.drawSymbol('X', x1, y1, '#69e7ff', 54 + ease * 18, angle);
+    this.drawSymbol('O', x2, y2, '#f7d3ff', 54 + ease * 18, -angle * 0.7);
+    if (progress > 0.86 && progress < 0.98 && Math.random() < 0.22) {
+      waves.push(new Shockwave(this.cx, this.cy, choice(palettes.tie), rand(90, 170), 0.72, 3));
+    }
+  }
+  drawBalanceEmblem(t) {
+    const appear = Math.max(0, Math.min(1, (t - 2.1) / 1.15));
+    if (!appear) return;
+    const pulse = 1 + Math.sin(t * 4.4) * 0.035;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = appear;
+    ctx.translate(this.cx, this.cy);
+    ctx.scale(pulse, pulse);
+    const r = Math.min(this.bounds.w, H) * 0.14;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2.3);
+    g.addColorStop(0, 'rgba(255,255,255,0.50)');
+    g.addColorStop(0.18, 'rgba(105,231,255,0.44)');
+    g.addColorStop(0.42, 'rgba(179,156,255,0.26)');
+    g.addColorStop(1, 'rgba(105,231,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, r * 2.3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(216,255,248,0.82)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();
+    ctx.strokeStyle = 'rgba(247,211,255,0.82)';
+    ctx.beginPath(); ctx.arc(0, 0, r, Math.PI * 0.5, Math.PI * 1.5); ctx.stroke();
+    ctx.font = `900 ${Math.max(34, r * 0.72)}px system-ui`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(216,255,248,0.92)'; ctx.fillText('X', -r * 0.42, 0);
+    ctx.fillStyle = 'rgba(247,211,255,0.92)'; ctx.fillText('O', r * 0.42, 0);
+    ctx.restore();
+  }
+  drawText(t) {
+    const appear = Math.max(0, Math.min(1, (t - 2.75) / 0.9));
+    if (!appear) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = appear;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#69e7ff'; ctx.shadowBlur = 22;
+    ctx.font = `900 ${Math.max(30, Math.min(W, H) * 0.075)}px system-ui`;
+    ctx.fillStyle = '#f3f0ff'; ctx.fillText('Cosmic Stalemate', this.cx, H * 0.78);
+    ctx.shadowBlur = 10;
+    ctx.font = `800 ${Math.max(15, Math.min(W, H) * 0.028)}px system-ui`;
+    ctx.fillStyle = '#d8fff8'; ctx.fillText('Perfectly matched', this.cx, H * 0.84);
+    ctx.restore();
+  }
+  drawSymbol(symbol, x, y, color, size, rot) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.translate(x, y); ctx.rotate(rot);
+    ctx.font = `950 ${size}px system-ui`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = color; ctx.shadowBlur = 28;
+    ctx.fillStyle = hexAlpha(color, 0.92); ctx.fillText(symbol, 0, 0);
+    ctx.strokeStyle = hexAlpha('#ffffff', 0.42); ctx.lineWidth = 1.4; ctx.strokeText(symbol, 0, 0);
+    ctx.restore();
+  }
+}
+
 let winnerEffect = null;
 let loserEffect = null;
+let tieEffect = null;
 
 function play(newMode) {
   mode = newMode;
   lastMode = newMode;
   particles = []; flashes = []; waves = []; plumes = [];
+  tieEffect = null;
   startTime = performance.now(); previousTime = startTime; nextFireworkAt = 0;
   stage.classList.remove('shake');
 
@@ -377,15 +498,19 @@ function play(newMode) {
   if (newMode === 'winner') {
     modeLabel.textContent = 'Winner Fireworks';
     modeCopy.textContent = 'Celebratory neon bursts with glow trails, confetti, embers, and screen flash.';
-    winnerEffect = new WinnerFireworks({x: 0, y: 0, w: W, h: H}); loserEffect = null; winnerEffect.start();
+    winnerEffect = new WinnerFireworks({x: 0, y: 0, w: W, h: H}); loserEffect = null; tieEffect = null; winnerEffect.start();
   } else if (newMode === 'loser') {
     modeLabel.textContent = 'Loser Explosion';
     modeCopy.textContent = 'Stylized arcade nuke: mushroom cloud, shockwave, smoke, ash, and rumble.';
-    loserEffect = new LoserNuclearExplosion({x: 0, y: 0, w: W, h: H}); winnerEffect = null; loserEffect.start();
+    loserEffect = new LoserNuclearExplosion({x: 0, y: 0, w: W, h: H}); winnerEffect = null; tieEffect = null; loserEffect.start();
+  } else if (newMode === 'tie') {
+    modeLabel.textContent = 'Cosmic Stalemate';
+    modeCopy.textContent = 'Tie treatment: glowing X and O orbit, collide, then resolve into a balanced eclipse — Perfectly matched.';
+    tieEffect = new TieCosmicStalemate({x: 0, y: 0, w: W, h: H}); winnerEffect = null; loserEffect = null; tieEffect.start();
   } else {
     modeLabel.textContent = 'Side-by-side Comparison';
     modeCopy.textContent = 'Winner effect on the left, loser effect on the right for approval comparison.';
-    winnerEffect = new WinnerFireworks(left); loserEffect = new LoserNuclearExplosion(right); winnerEffect.start(); setTimeout(() => loserEffect.start(), 420);
+    tieEffect = null; winnerEffect = new WinnerFireworks(left); loserEffect = new LoserNuclearExplosion(right); winnerEffect.start(); setTimeout(() => loserEffect.start(), 420);
   }
 }
 
@@ -401,6 +526,7 @@ function animate(now) {
 
     if (winnerEffect) winnerEffect.update(elapsed);
     if (loserEffect) loserEffect.update(elapsed);
+    if (tieEffect) tieEffect.update(elapsed, dt);
 
     updateAll(dt, elapsed);
   } catch (error) {
@@ -476,6 +602,7 @@ function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 window.addEventListener('resize', () => { resizeCanvas(); play(lastMode); });
 document.getElementById('playWinner').addEventListener('click', () => play('winner'));
 document.getElementById('playLoser').addEventListener('click', () => play('loser'));
+document.getElementById('playTie').addEventListener('click', () => play('tie'));
 document.getElementById('playBoth').addEventListener('click', () => play('both'));
 document.getElementById('replay').addEventListener('click', () => play(lastMode));
 
